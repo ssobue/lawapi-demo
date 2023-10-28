@@ -1,0 +1,37 @@
+version: 2.1
+
+orbs:
+  # https://circleci.com/developer/orbs/orb/circleci/maven
+  maven: circleci/maven@1.4.1
+
+executors:
+  openjdk21:
+    docker:
+      # https://circleci.com/developer/ja/images/image/cimg/openjdk
+      - image: cimg/openjdk:21.0
+
+jobs:
+  native-test:
+    resource_class: large
+    docker:
+      - image: ghcr.io/graalvm/graalvm-ce:22.3.1
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "pom.xml" }}
+      - run: gu install native-image
+      # https://docs.spring.io/spring-boot/docs/current/reference/html/native-image.html#native-image.developing-your-first-application.native-build-tools.maven
+      - run: ./mvnw -Pnative native:compile
+      - save_cache:
+          paths:
+            - ~/.m2/repository
+          key: v1-dependencies-{{ checksum "pom.xml" }}
+
+workflows:
+  verify:
+    jobs:
+      - maven/test:
+          name: test
+          executor: openjdk21
+      - native-test
